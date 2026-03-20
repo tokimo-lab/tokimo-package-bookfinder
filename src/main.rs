@@ -134,7 +134,7 @@ fn do_download(provider_name: &str, id: &str, output_dir: &str) -> Result<()> {
 
     let book = BookResult {
         id: id.to_string(),
-        title: String::new(),
+        title: id.to_string(),
         author: String::new(),
         format: String::new(),
         size: String::new(),

@@ -68,18 +68,30 @@ impl BookProvider for LibgenProvider {
 
             let cells: Vec<String> = row
                 .select(&td_sel)
-                .map(|td| td.text().collect::<Vec<_>>().join(" ").trim().to_string())
+                .map(|td| {
+                    td.text()
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                        .split_whitespace()
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                })
                 .collect();
 
             if cells.is_empty() {
                 continue;
             }
 
-            // Title: first cell text longer than 20 chars
+            // Title: first cell text longer than 20 chars, truncated to reasonable length
             let title = cells
                 .iter()
                 .find(|c| c.len() > 20)
-                .cloned()
+                .map(|t| {
+                    // Strip trailing ISBN-like numbers and noise
+                    let re = Regex::new(r"\s+\d{10,13}[;\s].*$").unwrap();
+                    let cleaned = re.replace(t, "").to_string();
+                    cleaned.chars().take(120).collect::<String>()
+                })
                 .unwrap_or_else(|| cells.first().cloned().unwrap_or_default());
 
             // Author: typically second cell, but use first non-title cell that isn't too short

@@ -83,7 +83,7 @@ impl BookProvider for ArchiveProvider {
     fn search(&self, query: &str) -> Result<Vec<BookResult>> {
         let encoded = urlencoding::encode(query);
         let url = format!(
-            "https://archive.org/advancedsearch.php?q={}+AND+mediatype:texts&fl=identifier,title,creator,format&rows=10&output=json",
+            "https://archive.org/advancedsearch.php?q={}+AND+mediatype:texts+AND+collection:opensource&fl=identifier,title,creator,format&rows=15&output=json",
             encoded
         );
 
@@ -145,32 +145,37 @@ impl BookProvider for ArchiveProvider {
 
         let files = meta.result.unwrap_or_default();
 
-        // Find a suitable PDF: prefer source=original
-        let pdf_file = files
+        // Find a suitable file: prefer PDF, fall back to EPUB
+        let downloadable_extensions = ["pdf", "epub"];
+        let pdf_file = downloadable_extensions
             .iter()
-            .filter(|f| {
-                f.name
-                    .as_deref()
-                    .map(|n| n.to_lowercase().ends_with(".pdf"))
-                    .unwrap_or(false)
+            .find_map(|target_ext| {
+                files
+                    .iter()
+                    .filter(|f| {
+                        f.name
+                            .as_deref()
+                            .map(|n| n.to_lowercase().ends_with(&format!(".{}", target_ext)))
+                            .unwrap_or(false)
+                    })
+                    .filter(|f| {
+                        // Skip files > MAX_FILE_SIZE
+                        f.size
+                            .as_deref()
+                            .and_then(|s| s.parse::<u64>().ok())
+                            .map(|sz| sz <= MAX_FILE_SIZE)
+                            .unwrap_or(true)
+                    })
+                    .min_by_key(|f| {
+                        // Prefer original source (lower key = higher priority)
+                        if f.source.as_deref() == Some("original") {
+                            0
+                        } else {
+                            1
+                        }
+                    })
             })
-            .filter(|f| {
-                // Skip files > MAX_FILE_SIZE
-                f.size
-                    .as_deref()
-                    .and_then(|s| s.parse::<u64>().ok())
-                    .map(|sz| sz <= MAX_FILE_SIZE)
-                    .unwrap_or(true)
-            })
-            .min_by_key(|f| {
-                // Prefer original source (lower key = higher priority)
-                if f.source.as_deref() == Some("original") {
-                    0
-                } else {
-                    1
-                }
-            })
-            .context("No downloadable PDF found for this item")?;
+            .context("No downloadable PDF or EPUB found for this item")?;
 
         let filename = pdf_file.name.as_deref().unwrap();
         let encoded_filename = urlencoding::encode(filename);
@@ -186,8 +191,24 @@ impl BookProvider for ArchiveProvider {
             .context("Archive.org download request failed")?;
 
         if !resp.status().is_success() {
+            // Try alternate: some items have _text.pdf derivative
+            let alt_url = format!(
+                "https://archive.org/download/{}/{}_text.pdf",
+                identifier, identifier
+            );
+            let alt_resp = self.client.get(&alt_url).send();
+            if let Ok(r) = alt_resp {
+                if r.status().is_success() {
+                    let safe_title = sanitize_filename(&book.title);
+                    let out_path = output_dir.join(format!("{}.pdf", safe_title));
+                    let mut file = std::fs::File::create(&out_path).context("Failed to create output file")?;
+                    let bytes = r.bytes().context("Failed to read download bytes")?;
+                    file.write_all(&bytes)?;
+                    return Ok(out_path);
+                }
+            }
             anyhow::bail!(
-                "Download failed with HTTP status {}",
+                "Download failed with HTTP status {} (this item may require borrowing)",
                 resp.status()
             );
         }
