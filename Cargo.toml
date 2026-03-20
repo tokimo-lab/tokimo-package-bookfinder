@@ -1,0 +1,17 @@
+[package]
+name = "bookfinder"
+version = "0.1.0"
+edition = "2021"
+description = "CLI tool to search and download books from multiple sources"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+reqwest = { version = "0.12", features = ["blocking", "cookies"] }
+scraper = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+colored = "3"
+indicatif = "0.17"
+regex = "1"
+urlencoding = "2"
