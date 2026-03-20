@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-linux-gnu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-gnu-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo build --release --target x86_64-unknown-linux-gnu
+      - run: tar czf bookfinder-x86_64-unknown-linux-gnu.tar.gz -C target/x86_64-unknown-linux-gnu/release bookfinder
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bookfinder-x86_64-unknown-linux-gnu
+          path: bookfinder-x86_64-unknown-linux-gnu.tar.gz
+
+  build-linux-musl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-musl-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo apt-get install -y musl-tools
+      - run: cargo build --release --target x86_64-unknown-linux-musl
+      - run: tar czf bookfinder-x86_64-unknown-linux-musl.tar.gz -C target/x86_64-unknown-linux-musl/release bookfinder
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bookfinder-x86_64-unknown-linux-musl
+          path: bookfinder-x86_64-unknown-linux-musl.tar.gz
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: windows-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo build --release --target x86_64-pc-windows-msvc
+      - run: Compress-Archive -Path target\x86_64-pc-windows-msvc\release\bookfinder.exe -DestinationPath bookfinder-x86_64-pc-windows-msvc.zip
+        shell: pwsh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bookfinder-x86_64-pc-windows-msvc
+          path: bookfinder-x86_64-pc-windows-msvc.zip
+
+  build-macos-x86:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: macos-x86-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo build --release --target x86_64-apple-darwin
+      - run: tar czf bookfinder-x86_64-apple-darwin.tar.gz -C target/x86_64-apple-darwin/release bookfinder
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bookfinder-x86_64-apple-darwin
+          path: bookfinder-x86_64-apple-darwin.tar.gz
+
+  build-macos-aarch64:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: macos-aarch64-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo build --release --target aarch64-apple-darwin
+      - run: tar czf bookfinder-aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin/release bookfinder
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bookfinder-aarch64-apple-darwin
+          path: bookfinder-aarch64-apple-darwin.tar.gz
+
+  release:
+    needs:
+      - build-linux-gnu
+      - build-linux-musl
+      - build-windows
+      - build-macos-x86
+      - build-macos-aarch64
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*

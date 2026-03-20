@@ -3,15 +3,32 @@ name = "bookfinder"
 version = "0.1.0"
 edition = "2021"
 description = "CLI tool to search and download books from multiple sources"
+license = "MIT"
+repository = "https://github.com/username/bookfinder"
+homepage = "https://github.com/username/bookfinder"
+keywords = ["books", "library", "libgen", "download", "cli"]
+categories = ["command-line-utilities"]
+
+[lib]
+name = "bookfinder"
+path = "src/lib.rs"
+
+[[bin]]
+name = "bookfinder"
+path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-reqwest = { version = "0.12", features = ["blocking", "cookies"] }
+reqwest = { version = "0.12", features = ["cookies", "gzip", "brotli", "stream"] }
 scraper = "0.22"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+async-trait = "0.1"
 anyhow = "1"
 colored = "3"
 indicatif = "0.17"
 regex = "1"
 urlencoding = "2"
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+tokio-stream = "0.1"
