@@ -2,12 +2,12 @@
 name = "bookfinder"
 version = "0.1.0"
 edition = "2021"
-description = "CLI tool to search and download books from multiple sources"
+description = "Multi-source book search and download library (LibGen, Project Gutenberg, Internet Archive)"
 license = "MIT"
-repository = "https://github.com/username/bookfinder"
-homepage = "https://github.com/username/bookfinder"
-keywords = ["books", "library", "libgen", "download", "cli"]
-categories = ["command-line-utilities"]
+repository = "https://github.com/tokimo-lab/tokimo-package-bookfinder"
+homepage = "https://github.com/tokimo-lab/tokimo-package-bookfinder"
+keywords = ["books", "library", "libgen", "download", "search"]
+categories = ["text-processing"]
 
 [lib]
 name = "bookfinder"
