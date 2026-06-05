@@ -22,7 +22,10 @@ impl AnnasArchiveProvider {
             .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .build()
             .expect("Failed to build HTTP client");
-        Self { client, lang: lang.into() }
+        Self {
+            client,
+            lang: lang.into(),
+        }
     }
 }
 
@@ -32,7 +35,8 @@ pub fn parse_annas_html(html: &str, _lang: &str) -> Vec<BookResult> {
     let a_sel = Selector::parse("a[href]").unwrap();
     let md5_re = Regex::new(r"^/md5/([a-f0-9]{32})$").unwrap();
     let size_re = Regex::new(r"^\d[\d.,]*\s*(kB|KB|MB|GB|bytes?)$").unwrap();
-    let ext_re = Regex::new(r"^(?i)(pdf|epub|djvu|mobi|chm|azw3?|fb2|docx?|rtf|txt|lit|zip|rar)$").unwrap();
+    let ext_re =
+        Regex::new(r"^(?i)(pdf|epub|djvu|mobi|chm|azw3?|fb2|docx?|rtf|txt|lit|zip|rar)$").unwrap();
 
     let mut seen = std::collections::HashSet::new();
     let mut results = Vec::new();
@@ -70,7 +74,9 @@ pub fn parse_annas_html(html: &str, _lang: &str) -> Vec<BookResult> {
 
         // Look for a line that looks like author (before the metadata line)
         // Metadata line typically contains "|" separators: "2023 | English | PDF | 2.3 MB"
-        let meta_line_idx = lines.iter().position(|l| l.contains(" | ") || l.contains('|'));
+        let meta_line_idx = lines
+            .iter()
+            .position(|l| l.contains(" | ") || l.contains('|'));
 
         let author = meta_line_idx
             .and_then(|idx| if idx > 1 { lines.get(idx - 1) } else { None })
@@ -101,7 +107,14 @@ pub fn parse_annas_html(html: &str, _lang: &str) -> Vec<BookResult> {
             author,
             format,
             size,
-            provider: format!("annas-archive{}", if language.is_empty() { String::new() } else { format!(" ({})", language) }),
+            provider: format!(
+                "annas-archive{}",
+                if language.is_empty() {
+                    String::new()
+                } else {
+                    format!(" ({})", language)
+                }
+            ),
             download_id: md5,
         });
     }
@@ -118,11 +131,21 @@ fn resolve_filename(book: &BookResult, headers: &reqwest::header::HeaderMap) -> 
             re.captures(v).map(|c| c[1].trim().to_string())
         })
         .unwrap_or_else(|| {
-            let ext = if book.format.is_empty() { "bin" } else { &book.format };
+            let ext = if book.format.is_empty() {
+                "bin"
+            } else {
+                &book.format
+            };
             let safe_title: String = book
                 .title
                 .chars()
-                .map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' { c } else { '_' })
+                .map(|c| {
+                    if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' {
+                        c
+                    } else {
+                        '_'
+                    }
+                })
                 .collect();
             let truncated: String = safe_title.chars().take(100).collect();
             format!("{}.{}", truncated.trim(), ext)
@@ -174,7 +197,10 @@ fn extract_annas_detail_download_url(body: &str) -> Option<String> {
 async fn resolve_download_url(client: &Client, book: &BookResult) -> Result<String> {
     // First try the libgen.li ads page
     let ads_url = format!("https://libgen.li/ads.php?md5={}", book.download_id);
-    let resp = client.get(&ads_url).send().await
+    let resp = client
+        .get(&ads_url)
+        .send()
+        .await
         .context("Failed to fetch LibGen ads page for Anna's Archive MD5")?;
     let body = resp.text().await.context("Failed to read ads page body")?;
 
@@ -184,13 +210,17 @@ async fn resolve_download_url(client: &Client, book: &BookResult) -> Result<Stri
 
     // Fall back to Anna's Archive detail page
     let aa_url = format!("https://annas-archive.org/md5/{}", book.download_id);
-    let resp2 = client.get(&aa_url).send().await
+    let resp2 = client
+        .get(&aa_url)
+        .send()
+        .await
         .context("Failed to fetch Anna's Archive MD5 detail page")?;
-    let body2 = resp2.text().await
+    let body2 = resp2
+        .text()
+        .await
         .context("Failed to read Anna's Archive detail page")?;
 
-    extract_annas_detail_download_url(&body2)
-        .context("No download link found for this book")
+    extract_annas_detail_download_url(&body2).context("No download link found for this book")
 }
 
 #[async_trait]
@@ -206,9 +236,15 @@ impl BookProvider for AnnasArchiveProvider {
             encoded, self.lang
         );
 
-        let resp = self.client.get(&url).send().await
+        let resp = self
+            .client
+            .get(&url)
+            .send()
+            .await
             .context("Failed to fetch Anna's Archive search page")?;
-        let body = resp.text().await
+        let body = resp
+            .text()
+            .await
             .context("Failed to read Anna's Archive response body")?;
         Ok(parse_annas_html(&body, &self.lang))
     }
@@ -216,12 +252,19 @@ impl BookProvider for AnnasArchiveProvider {
     async fn download(&self, book: &BookResult, output_dir: &Path) -> Result<PathBuf> {
         let download_url = resolve_download_url(&self.client, book).await?;
 
-        let resp = self.client.get(&download_url).send().await
+        let resp = self
+            .client
+            .get(&download_url)
+            .send()
+            .await
             .context("Failed to download file")?;
 
         let filename = resolve_filename(book, resp.headers());
         let out_path = output_dir.join(&filename);
-        let bytes = resp.bytes().await.context("Failed to read download bytes")?;
+        let bytes = resp
+            .bytes()
+            .await
+            .context("Failed to read download bytes")?;
         let mut file = std::fs::File::create(&out_path)
             .with_context(|| format!("Failed to create file: {}", out_path.display()))?;
         file.write_all(&bytes)
@@ -238,17 +281,27 @@ impl BookProvider for AnnasArchiveProvider {
         use crate::types::DownloadEvent;
 
         macro_rules! send {
-            ($val:expr) => { if tx.send($val).await.is_err() { return; } };
+            ($val:expr) => {
+                if tx.send($val).await.is_err() {
+                    return;
+                }
+            };
         }
 
         let download_url = match resolve_download_url(&self.client, book).await {
             Ok(u) => u,
-            Err(e) => { send!(Err(e)); return; }
+            Err(e) => {
+                send!(Err(e));
+                return;
+            }
         };
 
         let mut resp = match self.client.get(&download_url).send().await {
             Ok(r) => r,
-            Err(e) => { send!(Err(e.into())); return; }
+            Err(e) => {
+                send!(Err(e.into()));
+                return;
+            }
         };
 
         let total_bytes = resp.content_length();
@@ -267,14 +320,23 @@ impl BookProvider for AnnasArchiveProvider {
             match resp.chunk().await {
                 Ok(Some(chunk)) => {
                     downloaded += chunk.len() as u64;
-                    send!(Ok(DownloadEvent::Data { bytes: chunk.to_vec(), downloaded }));
+                    send!(Ok(DownloadEvent::Data {
+                        bytes: chunk.to_vec(),
+                        downloaded
+                    }));
                 }
                 Ok(None) => break,
-                Err(e) => { send!(Err(e.into())); return; }
+                Err(e) => {
+                    send!(Err(e.into()));
+                    return;
+                }
             }
         }
 
-        send!(Ok(DownloadEvent::Done { filename, total_bytes: downloaded }));
+        send!(Ok(DownloadEvent::Done {
+            filename,
+            total_bytes: downloaded
+        }));
     }
 }
 
@@ -295,7 +357,11 @@ mod tests {
         assert_eq!(results.len(), 1);
         let book = &results[0];
         assert_eq!(book.id, "aabbccddeeff00112233445566778899");
-        assert!(book.title.contains("三体"), "title should contain 三体, got: {}", book.title);
+        assert!(
+            book.title.contains("三体"),
+            "title should contain 三体, got: {}",
+            book.title
+        );
         assert_eq!(book.format, "epub");
         assert!(book.provider.contains("annas-archive"));
     }
@@ -307,7 +373,11 @@ mod tests {
   <a href="/md5/aabbccddeeff00112233445566778899">Duplicate Link</a>
 </body></html>"#;
         let results = parse_annas_html(html, "en");
-        assert_eq!(results.len(), 1, "duplicate md5 links should be deduplicated");
+        assert_eq!(
+            results.len(),
+            1,
+            "duplicate md5 links should be deduplicated"
+        );
     }
 
     #[test]

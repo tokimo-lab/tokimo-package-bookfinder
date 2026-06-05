@@ -1,12 +1,12 @@
-pub mod libgen;
-pub mod gutenberg;
-pub mod archive;
 pub mod annas_archive;
+pub mod archive;
+pub mod gutenberg;
+pub mod libgen;
 
-use anyhow::Result;
-use std::path::{Path, PathBuf};
 use crate::types::BookResult;
+use anyhow::Result;
 use async_trait::async_trait;
+use std::path::{Path, PathBuf};
 
 #[async_trait]
 pub trait BookProvider: Send + Sync {

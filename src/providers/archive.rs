@@ -115,9 +115,14 @@ async fn resolve_archive_download(
     let identifier = &book.download_id;
 
     let meta_url = format!("https://archive.org/metadata/{}/files", identifier);
-    let resp = client.get(&meta_url).send().await
+    let resp = client
+        .get(&meta_url)
+        .send()
+        .await
         .context("Archive.org metadata request failed")?;
-    let body = resp.text().await
+    let body = resp
+        .text()
+        .await
         .context("Failed to read Archive.org metadata response")?;
     let meta: MetadataFilesResponse =
         serde_json::from_str(&body).context("Failed to parse Archive.org metadata JSON")?;
@@ -144,7 +149,11 @@ async fn resolve_archive_download(
                         .unwrap_or(true)
                 })
                 .min_by_key(|f| {
-                    if f.source.as_deref() == Some("original") { 0 } else { 1 }
+                    if f.source.as_deref() == Some("original") {
+                        0
+                    } else {
+                        1
+                    }
                 })
         })
         .context("No downloadable PDF or EPUB found for this item")?;
@@ -172,9 +181,15 @@ impl BookProvider for ArchiveProvider {
             encoded
         );
 
-        let resp = self.client.get(&url).send().await
+        let resp = self
+            .client
+            .get(&url)
+            .send()
+            .await
             .context("Archive.org search request failed")?;
-        let body = resp.text().await
+        let body = resp
+            .text()
+            .await
             .context("Failed to read Archive.org search response body")?;
 
         parse_archive_json(&body)
@@ -184,7 +199,11 @@ impl BookProvider for ArchiveProvider {
         let identifier = &book.download_id;
         let (filename, download_url) = resolve_archive_download(&self.client, book).await?;
 
-        let resp = self.client.get(&download_url).send().await
+        let resp = self
+            .client
+            .get(&download_url)
+            .send()
+            .await
             .context("Archive.org download request failed")?;
 
         if !resp.status().is_success() {
@@ -198,7 +217,8 @@ impl BookProvider for ArchiveProvider {
                 if r.status().is_success() {
                     let safe_title = sanitize_filename(&book.title);
                     let out_path = output_dir.join(format!("{}.pdf", safe_title));
-                    let mut file = std::fs::File::create(&out_path).context("Failed to create output file")?;
+                    let mut file =
+                        std::fs::File::create(&out_path).context("Failed to create output file")?;
                     let bytes = r.bytes().await.context("Failed to read download bytes")?;
                     file.write_all(&bytes)?;
                     return Ok(out_path);
@@ -217,7 +237,10 @@ impl BookProvider for ArchiveProvider {
             .unwrap_or("pdf");
         let out_path = output_dir.join(format!("{}.{}", safe_title, ext));
 
-        let bytes = resp.bytes().await.context("Failed to read downloaded data")?;
+        let bytes = resp
+            .bytes()
+            .await
+            .context("Failed to read downloaded data")?;
         let mut file = std::fs::File::create(&out_path).context("Failed to create output file")?;
         file.write_all(&bytes)?;
         file.flush()?;
@@ -233,15 +256,23 @@ impl BookProvider for ArchiveProvider {
         use crate::types::DownloadEvent;
 
         macro_rules! send {
-            ($val:expr) => { if tx.send($val).await.is_err() { return; } };
+            ($val:expr) => {
+                if tx.send($val).await.is_err() {
+                    return;
+                }
+            };
         }
 
         let identifier = &book.download_id;
 
-        let (resolved_filename, download_url) = match resolve_archive_download(&self.client, book).await {
-            Ok(v) => v,
-            Err(e) => { send!(Err(e)); return; }
-        };
+        let (resolved_filename, download_url) =
+            match resolve_archive_download(&self.client, book).await {
+                Ok(v) => v,
+                Err(e) => {
+                    send!(Err(e));
+                    return;
+                }
+            };
 
         let resp_result = self.client.get(&download_url).send().await;
         let mut resp = match resp_result {
@@ -263,7 +294,10 @@ impl BookProvider for ArchiveProvider {
                     }
                 }
             }
-            Err(e) => { send!(Err(e.into())); return; }
+            Err(e) => {
+                send!(Err(e.into()));
+                return;
+            }
         };
 
         let total_bytes = resp.content_length();
@@ -287,14 +321,23 @@ impl BookProvider for ArchiveProvider {
             match resp.chunk().await {
                 Ok(Some(chunk)) => {
                     downloaded += chunk.len() as u64;
-                    send!(Ok(DownloadEvent::Data { bytes: chunk.to_vec(), downloaded }));
+                    send!(Ok(DownloadEvent::Data {
+                        bytes: chunk.to_vec(),
+                        downloaded
+                    }));
                 }
                 Ok(None) => break,
-                Err(e) => { send!(Err(e.into())); return; }
+                Err(e) => {
+                    send!(Err(e.into()));
+                    return;
+                }
             }
         }
 
-        send!(Ok(DownloadEvent::Done { filename, total_bytes: downloaded }));
+        send!(Ok(DownloadEvent::Done {
+            filename,
+            total_bytes: downloaded
+        }));
     }
 }
 
@@ -319,7 +362,13 @@ fn detect_format(field: &Option<FormatField>) -> String {
 
 fn sanitize_filename(name: &str) -> String {
     name.chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect::<String>()
         .trim()
         .to_string()
@@ -356,7 +405,10 @@ mod tests {
         let json = r#"{"response": {"docs": [{"identifier": "no-title-no-author"}]}}"#;
         let results = parse_archive_json(json).unwrap();
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].title, "no-title-no-author", "identifier used as title fallback");
+        assert_eq!(
+            results[0].title, "no-title-no-author",
+            "identifier used as title fallback"
+        );
         assert_eq!(results[0].author, "Unknown");
     }
 

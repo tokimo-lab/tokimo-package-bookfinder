@@ -23,21 +23,18 @@ pub enum DownloadEvent {
         total_bytes: Option<u64>,
     },
     /// A chunk of file data
-    Data {
-        bytes: Vec<u8>,
-        downloaded: u64,
-    },
+    Data { bytes: Vec<u8>, downloaded: u64 },
     /// Download complete
-    Done {
-        filename: String,
-        total_bytes: u64,
-    },
+    Done { filename: String, total_bytes: u64 },
 }
 
 impl std::fmt::Display for BookResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}] [{}] {} - {} ({}, {})", 
-            self.provider, self.format, self.title, self.author, self.size, self.id)
+        write!(
+            f,
+            "[{}] [{}] {} - {} ({}, {})",
+            self.provider, self.format, self.title, self.author, self.size, self.id
+        )
     }
 }
 

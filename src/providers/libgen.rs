@@ -25,7 +25,9 @@ impl LibgenProvider {
     }
 }
 
-const KNOWN_EXTENSIONS: &[&str] = &["pdf", "epub", "djvu", "mobi", "chm", "azw3", "fb2", "doc", "docx", "rtf", "txt", "lit", "azw"];
+const KNOWN_EXTENSIONS: &[&str] = &[
+    "pdf", "epub", "djvu", "mobi", "chm", "azw3", "fb2", "doc", "docx", "rtf", "txt", "lit", "azw",
+];
 
 pub fn parse_libgen_html(html: &str) -> Vec<BookResult> {
     let document = Html::parse_document(html);
@@ -134,11 +136,21 @@ fn resolve_filename(book: &BookResult, headers: &reqwest::header::HeaderMap) -> 
             re.captures(v).map(|c| c[1].trim().to_string())
         })
         .unwrap_or_else(|| {
-            let ext = if book.format.is_empty() { "bin" } else { &book.format };
+            let ext = if book.format.is_empty() {
+                "bin"
+            } else {
+                &book.format
+            };
             let safe_title: String = book
                 .title
                 .chars()
-                .map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' { c } else { '_' })
+                .map(|c| {
+                    if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' {
+                        c
+                    } else {
+                        '_'
+                    }
+                })
                 .collect();
             let truncated: String = safe_title.chars().take(100).collect();
             format!("{}.{}", truncated.trim(), ext)
@@ -179,24 +191,45 @@ impl BookProvider for LibgenProvider {
             encoded
         );
 
-        let resp = self.client.get(&url).send().await.context("Failed to fetch LibGen search page")?;
-        let body = resp.text().await.context("Failed to read LibGen response body")?;
+        let resp = self
+            .client
+            .get(&url)
+            .send()
+            .await
+            .context("Failed to fetch LibGen search page")?;
+        let body = resp
+            .text()
+            .await
+            .context("Failed to read LibGen response body")?;
         Ok(parse_libgen_html(&body))
     }
 
     async fn download(&self, book: &BookResult, output_dir: &Path) -> Result<PathBuf> {
         let ads_url = format!("https://libgen.li/ads.php?md5={}", book.download_id);
-        let resp = self.client.get(&ads_url).send().await.context("Failed to fetch LibGen ads page")?;
+        let resp = self
+            .client
+            .get(&ads_url)
+            .send()
+            .await
+            .context("Failed to fetch LibGen ads page")?;
         let body = resp.text().await.context("Failed to read ads page body")?;
 
-        let download_url = extract_download_url(&body)
-            .context("No download link found on LibGen ads page")?;
+        let download_url =
+            extract_download_url(&body).context("No download link found on LibGen ads page")?;
 
-        let resp = self.client.get(&download_url).send().await.context("Failed to download file from LibGen")?;
+        let resp = self
+            .client
+            .get(&download_url)
+            .send()
+            .await
+            .context("Failed to download file from LibGen")?;
 
         let filename = resolve_filename(book, resp.headers());
         let out_path = output_dir.join(&filename);
-        let bytes = resp.bytes().await.context("Failed to read download bytes")?;
+        let bytes = resp
+            .bytes()
+            .await
+            .context("Failed to read download bytes")?;
         let mut file = std::fs::File::create(&out_path)
             .with_context(|| format!("Failed to create file: {}", out_path.display()))?;
         file.write_all(&bytes)
@@ -213,26 +246,44 @@ impl BookProvider for LibgenProvider {
         use crate::types::DownloadEvent;
 
         macro_rules! send {
-            ($val:expr) => { if tx.send($val).await.is_err() { return; } };
+            ($val:expr) => {
+                if tx.send($val).await.is_err() {
+                    return;
+                }
+            };
         }
 
         let ads_url = format!("https://libgen.li/ads.php?md5={}", book.download_id);
         let body = match self.client.get(&ads_url).send().await {
             Ok(r) => match r.text().await {
                 Ok(t) => t,
-                Err(e) => { send!(Err(e.into())); return; }
+                Err(e) => {
+                    send!(Err(e.into()));
+                    return;
+                }
             },
-            Err(e) => { send!(Err(e.into())); return; }
+            Err(e) => {
+                send!(Err(e.into()));
+                return;
+            }
         };
 
         let download_url = match extract_download_url(&body) {
             Some(u) => u,
-            None => { send!(Err(anyhow::anyhow!("No download link found on LibGen ads page"))); return; }
+            None => {
+                send!(Err(anyhow::anyhow!(
+                    "No download link found on LibGen ads page"
+                )));
+                return;
+            }
         };
 
         let mut resp = match self.client.get(&download_url).send().await {
             Ok(r) => r,
-            Err(e) => { send!(Err(e.into())); return; }
+            Err(e) => {
+                send!(Err(e.into()));
+                return;
+            }
         };
 
         let total_bytes = resp.content_length();
@@ -251,14 +302,23 @@ impl BookProvider for LibgenProvider {
             match resp.chunk().await {
                 Ok(Some(chunk)) => {
                     downloaded += chunk.len() as u64;
-                    send!(Ok(DownloadEvent::Data { bytes: chunk.to_vec(), downloaded }));
+                    send!(Ok(DownloadEvent::Data {
+                        bytes: chunk.to_vec(),
+                        downloaded
+                    }));
                 }
                 Ok(None) => break,
-                Err(e) => { send!(Err(e.into())); return; }
+                Err(e) => {
+                    send!(Err(e.into()));
+                    return;
+                }
             }
         }
 
-        send!(Ok(DownloadEvent::Done { filename, total_bytes: downloaded }));
+        send!(Ok(DownloadEvent::Done {
+            filename,
+            total_bytes: downloaded
+        }));
     }
 }
 

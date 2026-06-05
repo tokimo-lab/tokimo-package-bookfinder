@@ -56,9 +56,7 @@ pub fn parse_gutenberg_html(html: &str) -> Vec<BookResult> {
         let book_id = item
             .select(&link_sel)
             .filter_map(|a| a.value().attr("href"))
-            .find_map(|href| {
-                id_re.captures(href).map(|caps| caps[1].to_string())
-            });
+            .find_map(|href| id_re.captures(href).map(|caps| caps[1].to_string()));
 
         let book_id = match book_id {
             Some(id) => id,
@@ -91,9 +89,15 @@ impl BookProvider for GutenbergProvider {
             urlencoding::encode(query)
         );
 
-        let response = self.client.get(&url).send().await
+        let response = self
+            .client
+            .get(&url)
+            .send()
+            .await
             .context("Failed to send search request to Gutenberg")?;
-        let body = response.text().await
+        let body = response
+            .text()
+            .await
             .context("Failed to read Gutenberg search response")?;
 
         Ok(parse_gutenberg_html(&body))
@@ -105,7 +109,13 @@ impl BookProvider for GutenbergProvider {
         let sanitized_title: String = book
             .title
             .chars()
-            .map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' { c } else { '_' })
+            .map(|c| {
+                if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect();
         let filename = format!("{}.epub", sanitized_title.trim());
         let output_path = output_dir.join(&filename);
@@ -123,7 +133,11 @@ impl BookProvider for GutenbergProvider {
 
         let response = match response {
             Ok(resp) if resp.status().is_success() => resp,
-            _ => self.client.get(&fallback_url).send().await
+            _ => self
+                .client
+                .get(&fallback_url)
+                .send()
+                .await
                 .context("Failed to download from both Gutenberg URLs")?,
         };
 
@@ -135,11 +149,12 @@ impl BookProvider for GutenbergProvider {
             );
         }
 
-        let bytes = response.bytes().await
+        let bytes = response
+            .bytes()
+            .await
             .context("Failed to read download response bytes")?;
 
-        let mut file = fs::File::create(&output_path)
-            .context("Failed to create output file")?;
+        let mut file = fs::File::create(&output_path).context("Failed to create output file")?;
         file.write_all(&bytes)
             .context("Failed to write book to file")?;
 
@@ -154,13 +169,23 @@ impl BookProvider for GutenbergProvider {
         use crate::types::DownloadEvent;
 
         macro_rules! send {
-            ($val:expr) => { if tx.send($val).await.is_err() { return; } };
+            ($val:expr) => {
+                if tx.send($val).await.is_err() {
+                    return;
+                }
+            };
         }
 
         let sanitized_title: String = book
             .title
             .chars()
-            .map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' { c } else { '_' })
+            .map(|c| {
+                if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect();
         let filename = format!("{}.epub", sanitized_title.trim());
 
@@ -181,11 +206,15 @@ impl BookProvider for GutenbergProvider {
                 Ok(r) => {
                     send!(Err(anyhow::anyhow!(
                         "Download failed with status {} for book {}",
-                        r.status(), book.download_id
+                        r.status(),
+                        book.download_id
                     )));
                     return;
                 }
-                Err(e) => { send!(Err(e.into())); return; }
+                Err(e) => {
+                    send!(Err(e.into()));
+                    return;
+                }
             },
         };
 
@@ -204,14 +233,23 @@ impl BookProvider for GutenbergProvider {
             match resp.chunk().await {
                 Ok(Some(chunk)) => {
                     downloaded += chunk.len() as u64;
-                    send!(Ok(DownloadEvent::Data { bytes: chunk.to_vec(), downloaded }));
+                    send!(Ok(DownloadEvent::Data {
+                        bytes: chunk.to_vec(),
+                        downloaded
+                    }));
                 }
                 Ok(None) => break,
-                Err(e) => { send!(Err(e.into())); return; }
+                Err(e) => {
+                    send!(Err(e.into()));
+                    return;
+                }
             }
         }
 
-        send!(Ok(DownloadEvent::Done { filename, total_bytes: downloaded }));
+        send!(Ok(DownloadEvent::Done {
+            filename,
+            total_bytes: downloaded
+        }));
     }
 }
 
@@ -249,7 +287,11 @@ mod tests {
   </li>
 </ul>"#;
         let results = parse_gutenberg_html(html);
-        assert_eq!(results.len(), 0, "entries without ebook id should be skipped");
+        assert_eq!(
+            results.len(),
+            0,
+            "entries without ebook id should be skipped"
+        );
     }
 
     #[test]
@@ -260,7 +302,11 @@ mod tests {
   </li>
 </ul>"#;
         let results = parse_gutenberg_html(html);
-        assert_eq!(results.len(), 0, "entries with empty title should be skipped");
+        assert_eq!(
+            results.len(),
+            0,
+            "entries with empty title should be skipped"
+        );
     }
 
     #[test]

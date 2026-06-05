@@ -1,8 +1,8 @@
-pub mod types;
 pub mod providers;
+pub mod types;
 
-pub use types::{BookResult, DownloadEvent};
 pub use providers::BookProvider;
+pub use types::{BookResult, DownloadEvent};
 
 use futures::Stream;
 use tokio_stream::wrappers::ReceiverStream;
@@ -33,13 +33,14 @@ pub fn search_stream(query: impl Into<String>) -> impl Stream<Item = BookResult>
         let tx = tx.clone();
         let q = query.clone();
         tokio::spawn(async move {
-            match tokio::time::timeout(
-                std::time::Duration::from_secs(30),
-                provider.search(&q),
-            ).await {
+            match tokio::time::timeout(std::time::Duration::from_secs(30), provider.search(&q))
+                .await
+            {
                 Ok(Ok(results)) => {
                     for r in results {
-                        if tx.send(r).await.is_err() { break; }
+                        if tx.send(r).await.is_err() {
+                            break;
+                        }
                     }
                 }
                 _ => {}
@@ -63,7 +64,12 @@ pub fn download_stream(
         let provider = match providers.into_iter().find(|p| p.name() == provider_name) {
             Some(p) => p,
             None => {
-                let _ = tx.send(Err(anyhow::anyhow!("Provider '{}' not found", provider_name))).await;
+                let _ = tx
+                    .send(Err(anyhow::anyhow!(
+                        "Provider '{}' not found",
+                        provider_name
+                    )))
+                    .await;
                 return;
             }
         };
