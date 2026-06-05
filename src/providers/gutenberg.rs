@@ -15,6 +15,12 @@ pub struct GutenbergProvider {
     client: Client,
 }
 
+impl Default for GutenbergProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GutenbergProvider {
     pub fn new() -> Self {
         let client = Client::builder()

@@ -13,6 +13,12 @@ pub struct LibgenProvider {
     client: Client,
 }
 
+impl Default for LibgenProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LibgenProvider {
     pub fn new() -> Self {
         let client = Client::builder()

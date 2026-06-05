@@ -65,6 +65,12 @@ pub struct ArchiveProvider {
     client: reqwest::Client,
 }
 
+impl Default for ArchiveProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ArchiveProvider {
     pub fn new() -> Self {
         let client = reqwest::Client::builder()

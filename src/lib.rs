@@ -33,17 +33,14 @@ pub fn search_stream(query: impl Into<String>) -> impl Stream<Item = BookResult>
         let tx = tx.clone();
         let q = query.clone();
         tokio::spawn(async move {
-            match tokio::time::timeout(std::time::Duration::from_secs(30), provider.search(&q))
-                .await
+            if let Ok(Ok(results)) =
+                tokio::time::timeout(std::time::Duration::from_secs(30), provider.search(&q)).await
             {
-                Ok(Ok(results)) => {
-                    for r in results {
-                        if tx.send(r).await.is_err() {
-                            break;
-                        }
+                for r in results {
+                    if tx.send(r).await.is_err() {
+                        break;
                     }
                 }
-                _ => {}
             }
         });
     }
